@@ -13,6 +13,6 @@ try:
         params={'id': user_id, 'time': time, 'limit': 5},
     )
 except Exception as e:
-    raise ValueError(f'Ошибка при вымолнении запроса {type(e)}{str(e)}')
+    raise ValueError(f'Ошибка при выполнении запроса {type(e)}{str(e)}')
 
 print(r.json())
