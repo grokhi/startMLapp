@@ -4,7 +4,7 @@ from datetime import datetime
 
 client = TestClient(app.app)
 
-user_id = 1000
+user_id = 10000
 time = datetime(2021, 12, 20)
 
 try:

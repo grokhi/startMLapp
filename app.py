@@ -1,22 +1,39 @@
 import os
+from re import I
 import pandas as pd
 from typing import List
 from catboost import CatBoostClassifier
 from fastapi import FastAPI
-from schema import PostGet
+from schema import PostGet, Response 
 from datetime import datetime
 from sqlalchemy import create_engine
 from loguru import logger
+import hashlib
+
+
+# constants
+CONN = "postgresql://robot-startml-ro:pheiph0hahj1Vaif@"\
+        "postgres.lab.karpov.courses:6432/startml"
+SALT = 'my_salt'
+
+AB_TESTING = True
+
+DEFAULT_MODEL_PATH = 'catboost_enhanced_model'
+DEFAULT_MODEL_FEATURES_TABLE_NAME = 'grokhi_enhanced_model_posts_info_features'
+
+if AB_TESTING:
+    CONTROL_MODEL_PATH = 'catboost_base_model'
+    TEST_MODEL_PATH = 'catboost_enhanced_model'
+
+    CONTROL_MODEL_FEATURES_TABLE_NAME =  'grokhi_base_model_posts_info_features',
+    TEST_MODEL_FEATURES_TABLE_NAME =   'grokhi_enhanced_model_posts_info_features'
 
 app = FastAPI()
 
 def batch_load_sql(query: str) -> pd.DataFrame:
     CHUNKSIZE = 200000
     
-    engine = create_engine(
-        "postgresql://robot-startml-ro:pheiph0hahj1Vaif@"
-        "postgres.lab.karpov.courses:6432/startml"
-    )
+    engine = create_engine(CONN)
     conn = engine.connect().execution_options(stream_results=True)
     
     chunks = []
@@ -29,13 +46,25 @@ def batch_load_sql(query: str) -> pd.DataFrame:
 
 def get_model_path(path: str) -> str:
     if os.environ.get("IS_LMS") == "1":
-        MODEL_PATH = '/workdir/user_input/model'
-    else:
-        MODEL_PATH = path
-    return MODEL_PATH
+        if path == CONTROL_MODEL_PATH:
+            path = '/workdir/user_input/model_control'
+        elif path == TEST_MODEL_PATH:
+            path = '/workdir/user_input/model_test'
+    return path
 
 
-def load_features() -> pd.DataFrame:
+def get_exp_group(id: int) -> str:
+    value_str = str(id) + SALT
+    value_num = int(hashlib.md5(value_str.encode()).hexdigest(), 16)
+    percent = value_num % 100
+    if percent < 50:
+        return "control"
+    elif percent < 100:
+        return "test"
+    return "unknown"
+
+
+def load_features(ab_testing:bool=False) -> pd.DataFrame:
     logger.info('loading liked posts')
     liked_posts_query = '''
         SELECT distinct post_id, user_id
@@ -44,50 +73,90 @@ def load_features() -> pd.DataFrame:
         '''
     liked_posts = batch_load_sql(liked_posts_query)
 
-    logger.info('loading posts features')
-    posts_features = pd.read_sql('''
-        SELECT *
-        FROM public.posts_info_features ''',
-
-        con="postgresql://robot-startml-ro:pheiph0hahj1Vaif@"
-            "postgres.lab.karpov.courses:6432/startml"
-    )
-
     logger.info('loading user features')
     user_features = pd.read_sql('''
         SELECT *
         FROM public.user_data ''',
-
-        con="postgresql://robot-startml-ro:pheiph0hahj1Vaif@"
-            "postgres.lab.karpov.courses:6432/startml"
+        con=CONN
     )
-    
-    return [liked_posts, posts_features, user_features]
 
-def load_models():
-    # Заугрузка Catboost
+    if not ab_testing:
+        logger.info('loading posts features')
+        posts_features = pd.read_sql(f'''
+            SELECT *
+            FROM public.{DEFAULT_MODEL_FEATURES_TABLE_NAME} ''',
+            con=CONN
+        )
+        return [liked_posts, user_features, posts_features]
 
-    model_path = get_model_path('catboost_model')
-    loaded_model = CatBoostClassifier()
-    loaded_model.load_model(model_path)
+    else:
+        logger.info('loading posts features for model_control')
+        posts_features_model_control = pd.read_sql(f'''
+            SELECT *
+            FROM public.grokhi_base_model_posts_info_features''', #CONTROL_MODEL_FEATURES_TABLE_NAME
+            con=CONN
+        )
+        logger.info('loading posts features for model_test')
+        posts_features_model_test = pd.read_sql(f'''
+            SELECT *
+            FROM public.{TEST_MODEL_FEATURES_TABLE_NAME}''',
+            con=CONN
+        )
+        return [liked_posts, user_features, posts_features_model_control, posts_features_model_test]
 
-    return loaded_model
+
+def load_models(ab_testing:bool=False):
+    '''
+    load models() -> model
+    load models() -> (model_control, model_test) if ab_testing==True
+    '''
+    if ab_testing:
+        loaded_model_control = CatBoostClassifier()
+        control_model_path = get_model_path(CONTROL_MODEL_PATH)
+
+        loaded_model_test = CatBoostClassifier()
+        test_model_path = get_model_path(TEST_MODEL_PATH)
+
+        return (
+            loaded_model_control.load_model(control_model_path), 
+            loaded_model_test.load_model(test_model_path)
+        )
+    else:
+        loaded_model = CatBoostClassifier()
+        model_path = get_model_path(DEFAULT_MODEL_PATH)
+
+        return loaded_model.load_model(model_path)
+
 
 logger.info('loading model')
-model = load_models()
+model_control, model_test = load_models(AB_TESTING)
+
 logger.info('loading_features')
-features = load_features()
+features = load_features(AB_TESTING)
+
 logger.info('service is up and running')
 
 def get_recommended_feed(id: int, time: datetime, limit: int):
     logger.info(f'user_id: {id}')
     logger.info('reading_features')
-    user_features = features[2].loc[features[2].user_id == id]
+    user_features = features[1].loc[features[1].user_id == id]
     user_features = user_features.drop('user_id', axis=1)
 
     logger.info('droppping_columns')
-    posts_features = features[1].drop(['index', 'text'], axis=1)
-    content = features[1][['post_id', 'text', 'topic']]
+
+    if not AB_TESTING:
+        posts_features = features[2].drop(['index', 'text'], axis=1)
+        content = features[2][['post_id', 'text', 'topic']]
+    else:
+        exp_group = get_exp_group(id)
+        if exp_group == 'control':
+            posts_features = features[2].drop(['index', 'text'], axis=1)
+            content = features[2][['post_id', 'text', 'topic']]
+        elif exp_group == 'test':
+            posts_features = features[3].drop(['index', 'text'], axis=1)
+            content = features[3][['post_id', 'text', 'topic']]
+        else:
+            raise ValueError('unknown group')
 
     logger.info('zipping everything')
     add_user_features = dict(zip(user_features.columns, user_features.values[0]))
@@ -99,8 +168,12 @@ def get_recommended_feed(id: int, time: datetime, limit: int):
     user_posts_features['hour'] = time.hour
     user_posts_features['month'] = time.month
 
-    logger.info('predicting')
-    predicts = model.predict_proba(user_posts_features)[:, 1]
+    logger.info(f'predicting for user_id={id} from {exp_group} group')
+    if exp_group == 'control':
+        predicts = model_control.predict_proba(user_posts_features)[:, 1]
+    elif exp_group == 'test':
+        predicts = model_test.predict_proba(user_posts_features)[:, 1]
+
     user_posts_features['predicts'] = predicts
 
     logger.info('deleting liked posts')
@@ -110,15 +183,17 @@ def get_recommended_feed(id: int, time: datetime, limit: int):
 
     recommended_posts = filtered_.sort_values('predicts')[-limit:].index
 
-    return [
-        PostGet(**{
-            'id': i,
-            'text': content[content.post_id == i].text.values[0],
-            'topic': content[content.post_id == i].topic.values[0]
-        }) for i in recommended_posts
-    ]
+    return Response(**{
+        'exp_group': get_exp_group(id),
+        'recommendations': [
+            PostGet(**{
+                'id': i,
+                'text': content[content.post_id == i].text.values[0],
+                'topic': content[content.post_id == i].topic.values[0]
+            }) for i in recommended_posts
+        ]
+    })
     
-
-@app.get("/post/recommendations/", response_model=List[PostGet])
-def get_recommendations(id: int, time: datetime = datetime.now(), limit: int = 5) -> List[PostGet]:
+@app.get("/post/recommendations/", response_model=Response)
+def get_recommendations(id: int, time: datetime = datetime.now(), limit: int = 5) -> Response:
     return get_recommended_feed(id, time, limit)
