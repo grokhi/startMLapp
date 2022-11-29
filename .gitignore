@@ -13,3 +13,11 @@ dec\\newdf_full.csv
 dec\\newdf.csv
 dec/newdf_full.csv
 dec/newdf.csv
+newdf_full.csv
+newdf.csv
+dec/embeddings/embaug_dict.npy
+dec/embeddings/embaug_meanpooling_layer.npy
+dec/embeddings/embaug_num_labels.npy
+dec/embeddings/embaug_txt_labels.npy
+dec/embeddings/embdict_2.npy
+dec/embeddings/embdict.npy
