@@ -21,7 +21,7 @@ dec/embeddings/embaug_num_labels.npy
 dec/embeddings/embaug_txt_labels.npy
 dec/embeddings/embdict_2.npy
 dec/embeddings/embdict.npy
-__pycache__
+__pycache__/
 .vscode
 catboost_info
 catboost_info/learn/events.out.tfevents
@@ -31,3 +31,5 @@ catboost_info/catboost_training.json
 __pycache__/schema.cpython-310.pyc
 __pycache__/app.cpython-310.pyc
 .vscode/
+data/
+bert_embeddings/embdict.npy
