@@ -3,6 +3,7 @@ Modification of Start ML final project by karpov.courses
 
 * base_model.ipynb - catboost classification with text features extracted from TF-IDF representation with PCA decomposition
 * enhanced_model.ipynb - catboost classification with text features extracted from BERT representation with DEC-aug clusterization
+* to test application simply run test_app.py
 
 <!-- # Key features:
 1. Downloading chunks of data from **PostgresSQL** database using **FastAPI**
