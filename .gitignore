@@ -5,3 +5,5 @@ catboost_info/
 __pycache__
 dec/embeddings
 dec/predictions
+bert_embeddings/embdict.npy
+bert_embeddings/embeddings_full.npy
