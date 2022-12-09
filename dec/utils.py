@@ -43,7 +43,10 @@ def predict_cluster_accuracy(model, loader, device, reassigned:bool=False):
     for x, y in tqdm(loader, desc='Evaluate cluster accuracy'):
         x, y = x.to(device), y.to(device)
 
-        output = model(x)
+        if type(model)==IDEC:
+            output = model(x)[0]
+        else:
+            output = model(x)
         y_pred = output.argmax(1)
 
         targets.append(y)
@@ -60,7 +63,8 @@ def predict_cluster_accuracy(model, loader, device, reassigned:bool=False):
         return {
             'accuracy': accuracy, 
             'predicted': np.vectorize(reassignment_dict.get)(predicted),
-            'features': features # wrong
+            'features': features,
+            'reassignment_dict': reassignment_dict
         }
     else:
         return{
