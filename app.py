@@ -18,15 +18,15 @@ SALT = 'my_salt'
 
 AB_TESTING = True
 
-DEFAULT_MODEL_PATH = 'catboost_enhanced_model'
+DEFAULT_MODEL_PATH = 'recommendation_models/catboost_enhanced_model'
 DEFAULT_MODEL_FEATURES_TABLE_NAME = 'grokhi_enhanced_model_posts_info_features'
 
 if AB_TESTING:
-    CONTROL_MODEL_PATH = 'catboost_base_model'
-    TEST_MODEL_PATH = 'catboost_enhanced_model'
+    CONTROL_MODEL_PATH = 'recommendation_models/catboost_base_model'
+    TEST_MODEL_PATH = DEFAULT_MODEL_PATH
 
     CONTROL_MODEL_FEATURES_TABLE_NAME =  'grokhi_base_model_posts_info_features',
-    TEST_MODEL_FEATURES_TABLE_NAME =   'grokhi_enhanced_model_posts_info_features'
+    TEST_MODEL_FEATURES_TABLE_NAME =   DEFAULT_MODEL_FEATURES_TABLE_NAME
 
 app = FastAPI()
 
@@ -70,6 +70,7 @@ def load_features(ab_testing:bool=False) -> pd.DataFrame:
         SELECT distinct post_id, user_id
         FROM public.feed_data
         WHERE action = 'like'
+        LIMIT 200000
         '''
     liked_posts = batch_load_sql(liked_posts_query)
 
@@ -129,7 +130,7 @@ def load_models(ab_testing:bool=False):
 
 
 logger.info('loading model')
-model_control, model_test = load_models(AB_TESTING)
+model_s = load_models(AB_TESTING)
 
 logger.info('loading_features')
 features = load_features(AB_TESTING)
@@ -145,16 +146,20 @@ def get_recommended_feed(id: int, time: datetime, limit: int):
     logger.info('droppping_columns')
 
     if not AB_TESTING:
-        posts_features = features[2].drop(['index', 'text'], axis=1)
-        content = features[2][['post_id', 'text', 'topic']]
+        posts_features = features[2].drop(['index', 'text', 'topic'], axis=1)
+        content = features[2][['post_id', 'text', 'topic' ]]
     else:
         exp_group = get_exp_group(id)
         if exp_group == 'control':
-            posts_features = features[2].drop(['index', 'text'], axis=1)
-            content = features[2][['post_id', 'text', 'topic']]
+            posts_features = features[2].drop(
+                ['index', 'text', 'topic'], axis=1
+            )
+            content = features[2][['post_id', 'text', 'topic' ]]
         elif exp_group == 'test':
-            posts_features = features[3].drop(['index', 'text'], axis=1)
-            content = features[3][['post_id', 'text', 'topic']]
+            posts_features = features[3].drop(
+                ['index', 'text', 'topic', 'KMeansTextCluster',	'DECTextCluster', 'IDECaugTextCluster'], axis=1
+            )
+            content = features[3][['post_id', 'text', 'topic' ]]
         else:
             raise ValueError('unknown group')
 
@@ -168,11 +173,15 @@ def get_recommended_feed(id: int, time: datetime, limit: int):
     user_posts_features['hour'] = time.hour
     user_posts_features['month'] = time.month
 
-    logger.info(f'predicting for user_id={id} from {exp_group} group')
-    if exp_group == 'control':
-        predicts = model_control.predict_proba(user_posts_features)[:, 1]
-    elif exp_group == 'test':
-        predicts = model_test.predict_proba(user_posts_features)[:, 1]
+    if not AB_TESTING:
+        model = model_s[0]
+        predicts = model.predict_proba(user_posts_features)[:, 1]
+    else:
+        logger.info(f'predicting for user_id={id} from {exp_group} group')
+        if exp_group == 'control':
+            predicts = model_s[0].predict_proba(user_posts_features)[:, 1]
+        elif exp_group == 'test':
+            predicts = model_s[1].predict_proba(user_posts_features)[:, 1]
 
     user_posts_features['predicts'] = predicts
 
