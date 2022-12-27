@@ -3,6 +3,8 @@ import numpy as np
 import torch
 from tqdm import tqdm
 
+from deepclustering import IDEC
+
 def cluster_acc(y_true, y_pred, reassign:bool = False):
     """
     Calculate clustering accuracy. Require scikit-learn installed
