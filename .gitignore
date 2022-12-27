@@ -15,3 +15,4 @@ dataset_augmentation/embeddings/embaug_maxpooling_layer.npy
 dataset_augmentation/embeddings/embaug_meanpooling_layer.npy
 ab_tests/airflow/logs
 ab_tests/hw_11.ipynb
+ab_tests/airflow/dags/_process-employees.py
