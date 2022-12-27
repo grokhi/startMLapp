@@ -1,5 +1,5 @@
 *.csv
-!ab_tests/tmp_agg.csv
+!ab_tests/ab_test.csv
 
 data/
 recommendation_models/
