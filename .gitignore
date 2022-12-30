@@ -13,6 +13,7 @@ dec_aug/_old_train-bertembedaug.ipynb
 dataset_augmentation/embeddings/embaug_dict.npy
 dataset_augmentation/embeddings/embaug_maxpooling_layer.npy
 dataset_augmentation/embeddings/embaug_meanpooling_layer.npy
-ab_tests/airflow/logs
+airflow/logs/*
+!airflow/logs/.gitkeep 
 ab_tests/hw_11.ipynb
-ab_tests/airflow/dags/_process-employees.py
+airflow/dags/_process-employees.py
