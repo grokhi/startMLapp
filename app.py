@@ -18,14 +18,14 @@ SALT = 'my_salt'
 
 AB_TESTING = True
 
-DEFAULT_MODEL_PATH = 'recommendation_models/catboost_enhanced_model'
+DEFAULT_MODEL_PATH = 'airflow/recommendation_models/catboost_enhanced_model'
 DEFAULT_MODEL_FEATURES_TABLE_NAME = 'grokhi_enhanced_model_posts_info_features'
 
 if AB_TESTING:
-    CONTROL_MODEL_PATH = 'recommendation_models/catboost_base_model'
+    CONTROL_MODEL_PATH = 'airflow/recommendation_models/catboost_base_model'
     TEST_MODEL_PATH = DEFAULT_MODEL_PATH
 
-    CONTROL_MODEL_FEATURES_TABLE_NAME =  'grokhi_base_model_posts_info_features',
+    CONTROL_MODEL_FEATURES_TABLE_NAME =  'airflow/grokhi_base_model_posts_info_features',
     TEST_MODEL_FEATURES_TABLE_NAME =   DEFAULT_MODEL_FEATURES_TABLE_NAME
 
 app = FastAPI()

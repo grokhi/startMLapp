@@ -21,7 +21,6 @@ default_args = {
 test_model_name = 'new_model'
 
 
-
 def load_data_url(ti):
     """
     Option 1. URL way.
