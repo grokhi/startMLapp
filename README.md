@@ -19,4 +19,5 @@ Recently I found an interesting [paper by Subakti et al. (2022)](https://journal
 - Unfortunately, default catboost model (**.65**) showed less ROC-AUC score than in base model (**.67**). Need to tune it
 - Tuned catboost results: #TODO.
 
-TODO: What's next? Obtained results from base_model and enhanced_model will be validated using scheduling A/B tests on a local server. #abtests #airflow #docker #postgresql *See [file-not-yet-ready] for details*
+What's next? Obtained results from base_model and enhanced_model will be validated using scheduling A/B tests on a local server. #abtests #airflow #docker #postgresql *See airflow/dags folder for details. To run dag, simply build docker image in the folder and make docker-compose*
+TODO: make dags refactoring

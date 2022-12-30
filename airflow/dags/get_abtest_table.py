@@ -5,6 +5,7 @@ from airflow import DAG
 from airflow.operators.python_operator import PythonOperator
 from airflow.operators.postgres_operator import PostgresOperator
 from airflow.providers.postgres.hooks.postgres import PostgresHook
+from airflow.settings import AIRFLOW_HOME
 
 import psycopg2
 import os
@@ -139,6 +140,7 @@ def get_recommendations(
     user_id:pd.Series, 
     time:pd.Series, 
     user_features:pd.DataFrame, 
+    posts_features:pd.DataFrame,
     likes:pd.DataFrame, 
     limit:int = 5
 ) -> list:
@@ -166,9 +168,11 @@ def get_recommendations(
 
 def get_recommendations_base_model(ti):
 
+    # print("$AIRFLOW_HOME=", AIRFLOW_HOME)
+
     base_model = CatBoostClassifier()
     base_model.load_model(
-        './recommendation_models/catboost_base_model'
+        '/opt/airflow/dags/recommendation_models/catboost_base_model'
     )
 
     df = pd.read_json(
@@ -189,7 +193,14 @@ def get_recommendations_base_model(ti):
         )
     )
 
+    base_model_posts_features = pd.read_json(
+        ti.xcom_pull(
+            key='base_model_posts_features',
+        )
+    )
+
     print(df.columns)
+    print(df.shape)
     print('getting recommendations...')
     df['recommendations'] = df.apply(
         lambda row: get_recommendations(
@@ -197,6 +208,7 @@ def get_recommendations_base_model(ti):
             row['user_id'],
             row['date'],
             user_features=user_features,
+            posts_features=base_model_posts_features,
             likes=likes
         ), axis=1
     )
@@ -206,11 +218,86 @@ def get_recommendations_base_model(ti):
         value=df.to_json()
     )
                     
-def get_predictions_enhanced_model(ti):
-    pass
+def get_recommendations_enhanced_model(ti):
+
+    print("$AIRFLOW_HOME=", AIRFLOW_HOME)
+
+    enhanced_model = CatBoostClassifier()
+    enhanced_model.load_model(
+        '/opt/airflow/dags/recommendation_models/catboost_enhanced_model'
+    )
+
+    print('read')
+
+    df = pd.read_json(
+        ti.xcom_pull(
+            key='test_id',
+        )
+    )[:1000]
+
+    print('df')
+
+    likes = pd.read_json(
+        ti.xcom_pull(
+            key='likes',
+        )
+    )
+
+    print('likes')
+
+    user_features = pd.read_json(
+        ti.xcom_pull(
+            key='user_features',
+        )
+    )
+
+    print('user_features')
+    
+    enhanced_model_posts_features = pd.read_json(
+        ti.xcom_pull(
+            key='enhanced_model_posts_features',
+        )
+    )
+
+    print('enhanced_model_posts_features')
+
+    print(df.columns)
+    print(df.shape)
+    print('getting recommendations...')
+    df['recommendations'] = df.apply(
+        lambda row: get_recommendations(
+            enhanced_model,
+            row['user_id'],
+            row['date'],
+            user_features=user_features,
+            posts_features=enhanced_model_posts_features,
+            likes=likes
+        ), axis=1
+    )
+
+    ti.xcom_push(
+        key='enhanced_model_recommendations',
+        value=df.to_json()
+    )
 
 def get_hitrate(ti):
     print('Getting hitrate!')
+
+    # control_df = pd.read_json(
+    #     ti.xcom_pull(
+    #         key='base_model_recommendations',
+    #     )
+    # )
+    
+    # test_df = pd.read_json(
+    #     ti.xcom_pull(
+    #         key='enhanced_model_recommendations',
+    #     )
+    # )
+
+    # df = pd.concat([control_df, test_df])
+    # print(df.shape)
+    # print(df.sample(10))
 
 with DAG(
     'get_abtest_table', 
@@ -242,6 +329,11 @@ with DAG(
         python_callable=get_recommendations_base_model
     )
 
+    get_recommendations_enhanced_model  = PythonOperator(
+        task_id='get_recommendations_enhanced_model',
+        python_callable=get_recommendations_enhanced_model
+    )
+
     get_hitrate =  PythonOperator(
         task_id='get_hitrate',
         python_callable=get_hitrate
@@ -263,15 +355,11 @@ with DAG(
     #     """]
     # )
 
-    # [get_predictions_base_model, get_predictions_enhanced_model] 
+    # [get_recommendations_base_model, get_recommendations_enhanced_model] 
 
-    hook_data >> get_exp_groups\
-    >>\
-    get_features\
-    >>\
-    get_recommendations_base_model\
-    >> \
-    get_hitrate
+    hook_data >> get_exp_groups>>get_features\
+    >> get_recommendations_base_model\
+    >> get_hitrate
     # >> 
     # push2postgres_db
 
