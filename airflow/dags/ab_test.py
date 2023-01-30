@@ -7,6 +7,8 @@ from airflow import DAG
 from airflow.operators.python_operator import PythonOperator
 from airflow.providers.postgres.hooks.postgres import PostgresHook
 
+from utils.pipeline_config import cfgdct
+
 
 default_args = {
     'owner': 'airflow',
@@ -17,8 +19,6 @@ default_args = {
     'retry_delay': timedelta(minutes=5)
 }
 
-
-test_model_name = 'new_model'
 
 
 def load_data_url(ti):
@@ -37,7 +37,7 @@ def load_data_url(ti):
     )
 
 
-def load_data_postgresql_db(ti):
+def load_data_postgresql_db(ti, connection, tablename):
     """
     Option 2. Loads df from local postrges database.
     df contains already calculated hitrate metrics for recommendation system.
@@ -53,32 +53,31 @@ def load_data_postgresql_db(ti):
         Password : airflow
         Port : 5432 
     """
-    hook = PostgresHook(postgres_conn_id='postgres_localhost')
+    hook = PostgresHook(postgres_conn_id=connection)
     conn = hook.get_conn()
 
 
     df = hook.get_pandas_df(
-        sql = "select * from abtest", 
+        sql = f"select * from { tablename }", 
         parameters = {'conn_id':conn}
     )
 
-    print('DataFrame columns:', df.columns)
+    print('Fetched from table:', tablename )
+    print(df.sample(10))
 
     ti.xcom_push(
         key='df_abtest',
         value=df.to_json()
     )
 
-def ab_test(ti):
+def ab_test(ti, dataframe):
     """
     Calculates statistics which shows if change in model is statistically significant
     """
-    df = pd.read_json(
-        ti.xcom_pull(
-            key='df_abtest',
-            task_ids=f'load_df_{test_model_name}'
-        )
-    )
+    df = pd.read_json(dataframe)
+
+    mean_hitrate = df.groupby('exp_group').hitrate.mean()
+    print('Mean Hitrate is:', mean_hitrate)
 
     mannw =  mannwhitneyu(
         df[df.exp_group == 'control'].hitrate_new,
@@ -89,30 +88,37 @@ def ab_test(ti):
        mannw
     )
     if mannw[1] < .05: 
-        print('Statistically significant change. Metrics got better!')
+        print('Null-hypothesis of metrics equality rejected. It is statistically significant change. Metrics got better!')
     else:
-        print('Change is not statistically significant.')
+        print('Null-hypothesis of metrics equality is not rejected. Change is not statistically significant.')
 
 
 
 with DAG(
     'abtest_dag',
     description='abtest_for_control_and_test_groups',
-    start_date=datetime(2022, 1, 1),
+    start_date=datetime(2023, 1, 1),
     max_active_runs=2,
     schedule_interval=timedelta(days=1),
     default_args=default_args,
     catchup=False
 ) as dag:
+
     get_abtest_data = PythonOperator(
-        task_id = f'load_df_{test_model_name}',
+        task_id = 'fetch_data_from_local_db',
         python_callable=load_data_postgresql_db,
-        op_kwargs={'test_model_name':test_model_name}
+        op_kwargs={
+            'connection' : cfgdct['local_conn'],
+            'tablename' :  cfgdct['tablename']
+        }
     )
+
     analyze_significance_of_change = PythonOperator(
-        task_id='analyze_data',
+        task_id='analyze_significance_of_change',
         python_callable=ab_test,
-        op_kwargs={'test_model_name':test_model_name}
+        op_kwargs={
+            'dataframe' : "{{ti.xcom_pull(key='df_abtest')}}"
+        }
     )
 
     get_abtest_data >> analyze_significance_of_change
