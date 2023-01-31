@@ -1,7 +1,6 @@
 import pandas as pd
 import numpy as np
 import hashlib
-import os
 
 def get_abtest_table(ti, dataframe):
 

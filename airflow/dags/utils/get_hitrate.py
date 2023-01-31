@@ -2,9 +2,9 @@ import pandas as pd
 import numpy as np
 
 from scipy.stats import binomtest
-from utils.pipeline_config import cfgdct
+from utils.pipeline_config import cfg_dict
 
-TEST_MODE = cfgdct['test_mode']
+TEST_MODE = cfg_dict['test_mode']
 # TEST_MODE = False
 
 def get_hitrate(ti, likes, base_model_recommendations, enhanced_model_recommendations):
@@ -12,6 +12,8 @@ def get_hitrate(ti, likes, base_model_recommendations, enhanced_model_recommenda
     likes = pd.read_json(likes)
     control_views = pd.read_json(base_model_recommendations)    
     test_views = pd.read_json(enhanced_model_recommendations)
+
+    print(control_views[:5])
 
     if TEST_MODE:
         views = pd.read_json(
@@ -22,7 +24,7 @@ def get_hitrate(ti, likes, base_model_recommendations, enhanced_model_recommenda
     else:
         views = pd.concat([control_views, test_views])
 
-
+    
     tmp = (
         views.groupby('user_id')
         .exp_group.nunique().reset_index()
@@ -53,7 +55,7 @@ def get_hitrate(ti, likes, base_model_recommendations, enhanced_model_recommenda
 
     
     tmp = pd.merge(views, likes, on='user_id', how='outer')
-    None if TEST_MODE else tmp.dropna(inplace=True)
+    None if TEST_MODE else tmp.dropna(how='all', inplace=True)
 
     tmp.post_id = tmp.post_id.fillna(-1).astype(int)
 
@@ -68,11 +70,19 @@ def get_hitrate(ti, likes, base_model_recommendations, enhanced_model_recommenda
         tmp['recommendations'] = tmp.recommendations.apply(
         lambda x: list(map(int, filter(bool, x[1:-1].split(', '))))
         )
+
+    # tmp['recommendations'] = tmp.recommendations.apply(
+    #     lambda x: list(map(int, filter(bool, x[1:-1].split(' '))))
+    # )
+    
     
     print('Filtering data...')
     tmp.timestamp_x = tmp.timestamp_x.view(int) / 10**9
     tmp.timestamp_y = tmp.timestamp_y.view(int) / 10**9
-   
+
+
+    # print(tmp.sample(10,random_state=0)[['post_id','recommendations']])
+  
 
     tmp.post_id = tmp.apply(
         lambda row:
@@ -85,6 +95,10 @@ def get_hitrate(ti, likes, base_model_recommendations, enhanced_model_recommenda
         else
         row.post_id, axis=1
     )
+
+
+    print(tmp.sample(10,random_state=0)[['post_id','recommendations']])
+
 
     print('Aggregate hitrate values...')
 

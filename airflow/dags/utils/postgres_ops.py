@@ -4,12 +4,12 @@ import numpy as np
 from airflow.providers.postgres.hooks.postgres import PostgresHook
 
 
-def fetch_from_postgres(ti, connection):
+def fetchfrompostgres(ti, connection):
     hook = PostgresHook(postgres_conn_id=connection)
     conn = hook.get_conn()
 
     views = hook.get_pandas_df(
-        sql = "select * from views_karpov", 
+        sql = "select * from views", 
         parameters = {'conn_id':conn}
     )
     views.timestamp = pd.to_datetime(views.timestamp, unit='s')

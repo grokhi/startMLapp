@@ -1,5 +1,7 @@
 *.csv
 !ab_tests/ab_test.csv
+!ab_tests/views.csv
+!ab_tests/likes.csv
 
 data/
 catboost_info/
@@ -20,4 +22,5 @@ airflow/plugins/*
 !airflow/plugins/.gitkeep 
 
 ab_tests/hw_11.ipynb
+ab_tests/analysis.ipynb
 airflow/dags/_process-employees.py

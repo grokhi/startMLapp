@@ -3,8 +3,8 @@ import numpy as np
 import hashlib
 import json
 
-from utils.pipeline_config import cfgdct
-TEST_MODE = cfgdct['test_mode']
+from utils.pipeline_config import cfg_dict
+TEST_MODE = cfg_dict['test_mode']
 # TEST_MODE = False
 
 
@@ -15,7 +15,7 @@ def get_group(user:str, salt:str, group_count:int):
 
 def get_exp_groups(ti, salt, dataframe):
 
-    df = pd.read_json(dataframe)
+    df = pd.read_json(dataframe).drop(columns=['recommendations'])
 
     print(df.sample(10))
 
@@ -30,7 +30,7 @@ def get_exp_groups(ti, salt, dataframe):
         df['exp_group'] = df.user_id.apply(
             lambda user: get_group(user, salt, 2)
         )
-        df['exp_group'].map({'0': 'control', '1': 'test'})
+        df['exp_group'] = df['exp_group'].map({ 0: 'control', 1 : 'test'})
 
         control_id = df[df.exp_group=='control']
         test_id = df[df.exp_group=='test']

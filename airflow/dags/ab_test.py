@@ -7,7 +7,7 @@ from airflow import DAG
 from airflow.operators.python_operator import PythonOperator
 from airflow.providers.postgres.hooks.postgres import PostgresHook
 
-from utils.pipeline_config import cfgdct
+from utils.pipeline_config import cfg_dict
 
 
 default_args = {
@@ -108,8 +108,8 @@ with DAG(
         task_id = 'fetch_data_from_local_db',
         python_callable=load_data_postgresql_db,
         op_kwargs={
-            'connection' : cfgdct['local_conn'],
-            'tablename' :  cfgdct['tablename']
+            'connection' : cfg_dict['local_conn'],
+            'tablename' :  cfg_dict['tablename']
         }
     )
 

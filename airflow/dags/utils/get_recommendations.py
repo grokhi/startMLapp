@@ -1,9 +1,9 @@
 import pandas as pd
 from catboost import CatBoostClassifier
 
-from utils.pipeline_config import cfgdct
+from utils.pipeline_config import cfg_dict
 
-TEST_MODE = cfgdct['test_mode']
+TEST_MODE = cfg_dict['test_mode']
 LIMIT_RECS = 1000
 
 def get_recommendations(
@@ -37,23 +37,25 @@ def get_recommendations(
 
     return recommended_posts.to_list()
 
-def get_recommendations_base_model(ti, dataframe, likes, user_features, base_model_posts_features):
 
-    # print("$AIRFLOW_HOME=", AIRFLOW_HOME)
 
-    base_model = CatBoostClassifier()
-    base_model.load_model(
-        '/opt/airflow/dags/recommendation_models/catboost_base_model'
-    )
+def get_recommendations_model(
+    ti, dataframe, likes, user_features, 
+    model_posts_features,
+    model_path, output_key
+):
+
+    model = CatBoostClassifier()
+    model.load_model(model_path)
 
     if TEST_MODE:
-        df = pd.read_json(dataframe)[:LIMIT_RECS].drop(columns=['recommendations'])       
+        df = pd.read_json(dataframe)[:LIMIT_RECS]
     else:
-        df = pd.read_json(dataframe).drop(columns=['recommendations'])
+        df = pd.read_json(dataframe)
 
     likes = pd.read_json(likes)
     user_features = pd.read_json(user_features)
-    base_model_posts_features = pd.read_json(base_model_posts_features)
+    model_posts_features = pd.read_json(model_posts_features)
 
     print('Columns:', df.columns)
     print('Shape:', df.shape)
@@ -61,11 +63,11 @@ def get_recommendations_base_model(ti, dataframe, likes, user_features, base_mod
 
     df['recommendations'] = df.apply(
         lambda row: get_recommendations(
-            base_model,
+            model,
             row['user_id'],
             row['timestamp'],
             user_features=user_features,
-            posts_features=base_model_posts_features,
+            posts_features=model_posts_features,
             likes=likes
         ), axis=1
     )
@@ -73,46 +75,6 @@ def get_recommendations_base_model(ti, dataframe, likes, user_features, base_mod
     print(df.sample(10))
 
     ti.xcom_push(
-        key='base_model_recommendations',
-        value=df.to_json()
-    )
-
-def get_recommendations_enhanced_model(ti, dataframe, likes, user_features, enhanced_model_posts_features):
-
-    # print("$AIRFLOW_HOME=", AIRFLOW_HOME)
-
-    enhanced_model = CatBoostClassifier()
-    enhanced_model.load_model(
-        '/opt/airflow/dags/recommendation_models/catboost_enhanced_model'
-    )
-
-    if TEST_MODE:
-        df = pd.read_json(dataframe)[:LIMIT_RECS].drop(columns=['recommendations'])       
-    else:
-        df = pd.read_json(dataframe).drop(columns=['recommendations'])
-
-    likes = pd.read_json(likes)
-    user_features = pd.read_json(user_features)
-    enhanced_model_posts_features = pd.read_json(enhanced_model_posts_features)
-
-    print('Columns:', df.columns)
-    print('Shape:', df.shape)
-    print('getting recommendations...')
-
-    df['recommendations'] = df.apply(
-        lambda row: get_recommendations(
-            enhanced_model,
-            row['user_id'],
-            row['timestamp'],
-            user_features=user_features,
-            posts_features=enhanced_model_posts_features,
-            likes=likes
-        ), axis=1
-    )
-
-    print(df.sample(10))
-
-    ti.xcom_push(
-        key='enhanced_model_recommendations',
+        key=output_key,
         value=df.to_json()
     )
