@@ -1,7 +1,7 @@
 # Recommendation microservice
 Modification of microservice based on Start ML final project by karpov.courses <br />
-#fastapi #docker #catboost #postgres #airflow #bert #DEC #IDEC
-[#TODO: 1) catboost tuning, 2) add tests, 3) fix recommendation suggestion]
+#fastapi #docker #catboost #postgres #airflow #bert #DEC #IDEC <br />
+#TODO: 1) catboost tuning, 2) add tests, 3) fix recommendation suggestion
 
 * base_model.ipynb - catboost classification with text features extracted from TF-IDF representation with PCA decomposition
 * enhanced_model.ipynb - catboost classification with text features extracted from BERT representation with IDEC-aug clusterization
