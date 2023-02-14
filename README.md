@@ -1,6 +1,7 @@
 # Recommendation microservice
 Modification of microservice based on Start ML final project by karpov.courses <br />
 #fastapi #docker #catboost #postgres #airflow #bert #DEC #IDEC
+[#TODO: 1) catboost tuning, 2) add tests, 3) fix recommendation suggestion]
 
 * base_model.ipynb - catboost classification with text features extracted from TF-IDF representation with PCA decomposition
 * enhanced_model.ipynb - catboost classification with text features extracted from BERT representation with IDEC-aug clusterization
@@ -32,4 +33,3 @@ To do second, I integrated all steps of productional workflow and realised a Loc
 - Unfortunately, default catboost model (**.67**) showed higher ROC-AUC score than in enhanced model (**.65**). Need to tune it
 - Tuned catboost results: #TODO
 - Change of results in Hitrate score for control (**.71**) and test (**.72**) recommendations is statistically significant *Note! For now, KarpovCourses provided recommedations are used (see `/abtest/views.csv`)*. Null-hypothesis of means equality is rejected (Mannwhitneyu test, p-value<0.05)
-#TODO: add tests
